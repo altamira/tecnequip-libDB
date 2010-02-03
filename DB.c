@@ -4,7 +4,7 @@ const unsigned char DB_cryptkey[] = { 0x34, 0x12, 0x69, 0x54, 0xD2, 0xC4 };
 #define DB_CRYPTKEY_SIZE 6
 
 // Função que retorna checksum de ponteiro
-unsigned long CalcCheckSum(void *ptr, unsigned int tam)
+static unsigned long CalcCheckSum(void *ptr, unsigned int tam)
 {
   unsigned char *cptr = (unsigned char *)(ptr);
   unsigned long checksum = 0;
