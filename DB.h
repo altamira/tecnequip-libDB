@@ -36,6 +36,9 @@ void DB_Dump(struct strDB *, int);
 // Função que carrega o próximo registro.
 int DB_GetNextRow(struct strDB *sDB, int);
 
+unsigned int DB_GetCount(struct strDB *sDB, int nres);
+unsigned int DB_GetFieldNumber(struct strDB *sDB, int nres, char *campo);
+
 // Retorna o valor do campo 'pos' na linha atual. Caso seja inválido, retorna NULL.
 char *DB_GetData(struct strDB *sDB, int nres, unsigned int pos);
 
