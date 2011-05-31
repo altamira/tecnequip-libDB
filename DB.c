@@ -106,7 +106,8 @@ void DB_GravarConfig(struct strDB *sDB, char *src)
 int DB_LerConfig(struct strDB *sDB, char *src)
 {
 	struct strDB dbtmp;
-	long fd, ret=0;
+	long fd;
+	int ret=0;
 	unsigned long val, checksum, nstr;
 
 	CryptXOR(src, NULL, (unsigned char *)DB_cryptkey, DB_CRYPTKEY_SIZE);
