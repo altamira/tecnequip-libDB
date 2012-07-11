@@ -21,44 +21,27 @@ static unsigned long CalcCheckSum(void *ptr, unsigned int tam)
 void DB_Flush(struct strDB *sDB, int nres)
 {
 // Nada para fazer. Usando um result que não existe!
-	if(sDB->res[nres] == NULL || nres>=DB_MAX_RES || nres<0)
+	if(nres>=DB_MAX_RES || nres<0)
 		return;
 
-	while(mysql_fetch_row(sDB->res[nres])>0)
-		;
-
-	mysql_free_result(sDB->res[nres]);
+  if(sDB->Driver->fncFlush)
+    (sDB->Driver->fncFlush)(sDB, nres);
 }
 
 void DB_Free(struct strDB *sDB)
 {
-	int i;
-
 	free(sDB->user);
 	free(sDB->server);
 	free(sDB->passwd);
 	free(sDB->nome_db);
 
-	if(sDB->res != NULL)
-		{
-		for(i=0; i<DB_MAX_RES; i++)
-			DB_Flush(sDB, i);
-
-		free(sDB->res);
-		}
-
-	free(sDB->row);
+	if(sDB->Driver->fncFree)
+	  (sDB->Driver->fncFree)(sDB);
 }
 
 void DB_Clear(struct strDB *sDB)
 {
-	sDB->user    = NULL;
-	sDB->server  = NULL;
-	sDB->passwd  = NULL;
-	sDB->nome_db = NULL;
-
-	sDB->res     = NULL;
-	sDB->row     = NULL;
+  memset(sDB, 0, sizeof(*sDB));
 }
 
 // Funcao que grava a estrutura de configuracao no disco
@@ -119,7 +102,9 @@ int DB_LerConfig(struct strDB *sDB, char *src)
 		return ret;
 		}
 
-// Inicializa ponteiros
+// Inicializa estrutura que representa o banco
+// Feita a inicializacao de variaveis que nao podem ser lidas do arquivo,
+// como ponteiros para funcao, etc
 	DB_Clear(&dbtmp);
 
 	read(fd, &val, sizeof(val));
@@ -159,11 +144,6 @@ int DB_LerConfig(struct strDB *sDB, char *src)
 			sDB->passwd  = dbtmp.passwd ;
 			sDB->nome_db = dbtmp.nome_db;
 
-// Inicializacao de variaveis que nao podem ser lidas do arquivo,
-// como ponteiros para funcao, etc
-			dbtmp.res = NULL;
-			dbtmp.row = NULL;
-
 // Grava 1 em ret para que a função retorne OK
 			ret=1;
 			}
@@ -182,19 +162,29 @@ unsigned int DB_GetCount(struct strDB *sDB, int nres)
 	if(nres>=DB_MAX_RES || nres<0) // Usando um result que não existe!
 		return 0;
 
-	return mysql_num_rows(sDB->res[nres]);
+	return sDB->Driver->fncGetCount ? (sDB->Driver->fncGetCount)(sDB, nres) : 0;
 }
+
+extern struct DriverList * Drivers;
 
 int DB_Init(struct strDB *sDB)
 {
-	int i;
 	char *tmp;
+  int ret = 0;
 
-	sDB->row = NULL;
-	sDB->res = NULL;
+	// Inicializa a lista de drivers se ainda nao foi inicializado.
+	if(Drivers == NULL) {
+	  DB_InitDrivers();
+	}
 
-	if(mysql_init(&(sDB->db))==NULL)
-		return 0;
+  // Checa se o DriverID eh NULO.
+  // Isso apenas existe por questoes de compatibilidade. Assim, ja
+  // selecionamos o primeiro driver por default.
+	if(sDB->DriverID == NULL) {
+	  sDB->Driver = Drivers;
+	} else {
+	  sDB->Driver = DB_GetDriver(sDB->DriverID);
+	}
 
 //Copia as strings recebidas como parâmetro para mantê-las em memória
 // e não apenas em referência pelo ponteiro.
@@ -226,25 +216,22 @@ int DB_Init(struct strDB *sDB)
 		strcpy(sDB->nome_db, tmp);
 		}
 
-// Realiza a conexão com o banco
-	if (!mysql_real_connect(&(sDB->db), sDB->server, sDB->user, sDB->passwd, sDB->nome_db, 0, NULL, 0))
-		{
-		printf("Erro conectando ao banco de dados: %s\n",mysql_error(&(sDB->db)));
-		return 0;
-		}
+  sDB->status &= ~DB_FLAGS_CONNECTED;
+  if(sDB->Driver->fncInit) {
+    ret = (sDB->Driver->fncInit)(sDB);
+    if(ret > 0)
+      sDB->status |= DB_FLAGS_CONNECTED;
+  }
 
-	sDB->row = (MYSQL_ROW  *)(malloc(sizeof(MYSQL_ROW  )*DB_MAX_RES));
-	sDB->res = (MYSQL_RES **)(malloc(sizeof(MYSQL_RES *)*DB_MAX_RES));
-	for(i=0; i<DB_MAX_RES; i++)
-		sDB->res[i] = NULL;
-
-	return 2;
+  return ret;
 }
 
 void DB_Close(struct strDB *sDB)
 {
 	DB_Free(sDB);
-	mysql_close(&(sDB->db));
+
+  if(sDB->Driver->fncClose)
+    (sDB->Driver->fncClose)(sDB);
 }
 
 int DB_Execute(struct strDB *sDB, int nres, char *sql)
@@ -252,15 +239,14 @@ int DB_Execute(struct strDB *sDB, int nres, char *sql)
 	if(nres>=DB_MAX_RES || nres<0) // Usando um result que não existe!
 		return -2;
 
-	DB_Flush(sDB, nres); // Descarrega o resultado anterior.
+	// Descarrega o resultado anterior.
+	DBG("Descarregando resultados anteriores\n");
+  DB_Flush(sDB, nres);
 
-	if(mysql_real_query(&(sDB->db),sql,(unsigned int) strlen(sql)))
-		{
-		printf("Erro durante consulta SQL: %s\n", mysql_error(&(sDB->db)));
-		return -1;
-		}
-
-	sDB->res[nres] = mysql_store_result(&(sDB->db));
+  // Executa a consulta SQL
+  DBG("Executando SQL: '%s'\n", sql);
+  if(sDB->Driver->fncExecute)
+    return (sDB->Driver->fncExecute)(sDB, nres, sql);
 
 	return 0;
 }
@@ -269,53 +255,28 @@ int DB_GetNextRow(struct strDB *sDB, int nres)
 {
 	if(nres>=DB_MAX_RES || nres<0) // Usando um result que não existe!
 		return -1;
-	if(sDB->res[nres] == NULL)
-		return -2;
 
 	if(DB_GetCount(sDB, nres)>0)
-		return (int)(sDB->row[nres]=mysql_fetch_row(sDB->res[nres]));
+	  return sDB->Driver->fncGetNextRow ? (sDB->Driver->fncGetNextRow)(sDB, nres) : 0;
 
 	return -3;
 }
 
 void DB_Dump(struct strDB *sDB, int nres)
 {
-	int t,nf;
-
 	if(nres>=DB_MAX_RES || nres<0) // Usando um result que não existe!
 		return;
 
-	while(DB_GetNextRow(sDB, nres)>0)
-		{
-		nf = mysql_num_fields(sDB->res[nres]);
-		for(t=0;t<nf;t++)
-			{
-			printf("%s ",sDB->row[nres][t]);
-			}
-		printf("\n");
-		}
+  if(sDB->Driver->fncDump)
+    (sDB->Driver->fncDump)(sDB, nres);
 }
 
 unsigned int DB_GetFieldNumber(struct strDB *sDB, int nres, char *campo)
 {
-	unsigned int n, i;
-	MYSQL_FIELD *fields;
-
 	if(nres>=DB_MAX_RES || nres<0) // Usando um result que não existe!
 		return 0;
 
-	n = mysql_num_fields(sDB->res[nres]);
-	fields = mysql_fetch_fields(sDB->res[nres]);
-	for(i = 0; i < n; i++)
-		{
-		if(!strcmp(fields[i].name, campo))
-			break;
-		}
-
-	if(i < n) // Encontrou, retorna o índice.
-		return i;
-
-	return 0; // Não encontrou. Retorna o primeiro índice pois ele sempre existe.
+	return sDB->Driver->fncGetFieldNumber ? (sDB->Driver->fncGetFieldNumber)(sDB, nres, campo) : 0;
 }
 
 // Retorna o valor do campo 'pos' na linha atual. Caso seja inválido, retorna NULL.
@@ -324,8 +285,5 @@ char *DB_GetData(struct strDB *sDB, int nres, unsigned int pos)
 	if(nres>=DB_MAX_RES || nres<0) // Usando um result que não existe!
 		return NULL;
 
-	if(pos < mysql_num_fields(sDB->res[nres]))
-		return sDB->row[nres][pos];
-
-	return NULL;
+	return sDB->Driver->fncGetData ? (sDB->Driver->fncGetData)(sDB, nres, pos) : NULL;
 }

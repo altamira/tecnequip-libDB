@@ -1,23 +1,42 @@
 #ifndef DB_H
 #define DB_H
 
-#include <mysql/mysql.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <string.h>
 #include <stdlib.h>
 #include "CryptXOR.h"
 
+// Descomentar a linha abaixo para ativar o modo de DEBUG
+//#define DB_DEBUG
+
+// Se em modo de DEBUG, exibe mensagens de erro no console
+#ifdef DB_DEBUG
+#define DBG(format, ...) printf(format, __VA_ARGS__)
+#else
+#define DBG(format, ...)
+#endif
+
+#include "Drivers.h"
+
 #define DB_MAX_RES    4
 #define DB_CFG_MAGIC  0x7EA5C94A
 #define DB_ARQ_CONFIG "db.cfg"
 
+// Flags de status do banco
+#define DB_FLAGS_CONNECTED 0x0001
+
 struct strDB
 {
-	MYSQL db;
-	MYSQL_ROW  *row;
-	MYSQL_RES **res;
+  // Flags do Banco
+  unsigned int status;
 
+  // Definicoes do driver utilizado
+  char              * DriverID;
+  struct DriverList * Driver;
+	struct DriverData   Data;
+
+	// Dados para conexao ao banco
 	char *server, *user, *passwd, *nome_db;
 };
 

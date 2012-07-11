@@ -12,6 +12,8 @@ AR=ar
 CC=gcc
 CFLAGS=-g -Wall
 
+TEST_FILE=TestDB
+
 OBJ_APP   = $(patsubst %.c,%.o,$(wildcard *.c))
 PROG_NAME = libDB
 
@@ -27,6 +29,7 @@ PROG_NAME = libDB
 #------------------------------------------------------------------------------
 $(PROG_NAME):  makefile $(OBJ_APP)
 	$(AR) -cvq $(PROG_NAME).a $(OBJ_APP)
+	$(CC) -o $(TEST_FILE) $(TEST_FILE).o $(PROG_NAME).a -lmysqlclient -lsybdb
 
 #------------------------------------------------------------------------------
 # clean target: Removes all generated files
