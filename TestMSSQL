@@ -1,0 +1,4 @@
+#!/bin/sh
+
+./TestDB MSSQL AltamiraSQLServer scada altamira@2012 SCADA "$*"
+

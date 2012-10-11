@@ -1,0 +1,4 @@
+#!/bin/sh
+
+./TestDB MySQL localhost ihm alis666net cv_integrado "$*"
+

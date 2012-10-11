@@ -1,0 +1,4 @@
+#/bin/sh
+
+./TestMSSQL "insert into OPERADOR (NOME,USUARIO,SENHA,LEMBRETE,PERFIL) values ('Fernando Jose','fernando','KYGWZ6wYQ/E','fjose',1)"
+

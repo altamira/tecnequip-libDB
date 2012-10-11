@@ -41,7 +41,7 @@ void DB_Free(struct strDB *sDB)
 
 void DB_Clear(struct strDB *sDB)
 {
-  memset(sDB, 0, sizeof(*sDB));
+  memset(sDB, 0, sizeof(struct strDB));
 }
 
 // Funcao que grava a estrutura de configuracao no disco
@@ -232,6 +232,8 @@ void DB_Close(struct strDB *sDB)
 
   if(sDB->Driver->fncClose)
     (sDB->Driver->fncClose)(sDB);
+
+  sDB->status &= ~DB_FLAGS_CONNECTED;
 }
 
 int DB_Execute(struct strDB *sDB, int nres, char *sql)
@@ -271,12 +273,28 @@ void DB_Dump(struct strDB *sDB, int nres)
     (sDB->Driver->fncDump)(sDB, nres);
 }
 
-unsigned int DB_GetFieldNumber(struct strDB *sDB, int nres, char *campo)
+unsigned int DB_GetFieldCount(struct strDB *sDB, int nres)
 {
 	if(nres>=DB_MAX_RES || nres<0) // Usando um result que não existe!
 		return 0;
 
-	return sDB->Driver->fncGetFieldNumber ? (sDB->Driver->fncGetFieldNumber)(sDB, nres, campo) : 0;
+	return sDB->Driver->fncGetFieldCount ? (sDB->Driver->fncGetFieldCount)(sDB, nres) : 0;
+}
+
+char *DB_GetFieldName(struct strDB *sDB, int nres, unsigned int pos)
+{
+  if(nres>=DB_MAX_RES || nres<0) // Usando um result que não existe!
+    return NULL;
+
+  return sDB->Driver->fncGetFieldName ? (sDB->Driver->fncGetFieldName)(sDB, nres, pos) : NULL;
+}
+
+unsigned int DB_GetFieldNumber(struct strDB *sDB, int nres, char *campo)
+{
+  if(nres>=DB_MAX_RES || nres<0) // Usando um result que não existe!
+    return 0;
+
+  return sDB->Driver->fncGetFieldNumber ? (sDB->Driver->fncGetFieldNumber)(sDB, nres, campo) : 0;
 }
 
 // Retorna o valor do campo 'pos' na linha atual. Caso seja inválido, retorna NULL.

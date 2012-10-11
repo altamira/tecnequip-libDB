@@ -12,9 +12,9 @@
 
 // Se em modo de DEBUG, exibe mensagens de erro no console
 #ifdef DB_DEBUG
-#define DBG(format, ...) printf(format, __VA_ARGS__)
+#define DBG(...) printf(__VA_ARGS__)
 #else
-#define DBG(format, ...)
+#define DBG(...)
 #endif
 
 #include "Drivers.h"
@@ -55,8 +55,10 @@ void DB_Dump(struct strDB *, int);
 // Função que carrega o próximo registro.
 int DB_GetNextRow(struct strDB *sDB, int);
 
-unsigned int DB_GetCount(struct strDB *sDB, int nres);
-unsigned int DB_GetFieldNumber(struct strDB *sDB, int nres, char *campo);
+unsigned int   DB_GetCount      (struct strDB *sDB, int nres);
+unsigned int   DB_GetFieldCount (struct strDB *sDB, int nres);
+char         * DB_GetFieldName  (struct strDB *sDB, int nres, unsigned int pos);
+unsigned int   DB_GetFieldNumber(struct strDB *sDB, int nres, char *campo);
 
 // Retorna o valor do campo 'pos' na linha atual. Caso seja inválido, retorna NULL.
 char *DB_GetData(struct strDB *sDB, int nres, unsigned int pos);

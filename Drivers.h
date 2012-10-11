@@ -27,6 +27,8 @@ struct DriverList
   int            (*fncExecute       )(struct strDB *, int, char *);
   int            (*fncGetNextRow    )(struct strDB *, int);
   void           (*fncDump          )(struct strDB *, int);
+  unsigned int   (*fncGetFieldCount )(struct strDB *, int);
+  char         * (*fncGetFieldName  )(struct strDB *, int, unsigned int);
   unsigned int   (*fncGetFieldNumber)(struct strDB *, int, char *);
   char         * (*fncGetData       )(struct strDB *, int, unsigned int);
 

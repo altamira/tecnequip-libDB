@@ -64,13 +64,65 @@ int err_handler(DBPROCESS * dbproc, int severity, int dberr, int oserr,
 /************** Fim dos Handlers **************/
 /**********************************************/
 
+static unsigned int MSSQL_GetFieldCount(struct strDB *sDB, int nres)
+{
+  struct mssql_data *MSD = (struct mssql_data *)sDB->Data.data;
+
+  return dbnumcols(MSD->res[nres].dbproc);
+}
+
+static char * MSSQL_GetFieldName(struct strDB *sDB, int nres, unsigned int pos)
+{
+  unsigned int n;
+  struct mssql_data *MSD = (struct mssql_data *)sDB->Data.data;
+
+  if(MSD->res[nres].cols == NULL) {
+    DBG("colunas NULAS!\n");
+    return NULL;
+  }
+
+  n = MSSQL_GetFieldCount(sDB, nres);
+  if(pos >= n) {
+    DBG("Coluna inexistente!\n");
+    return NULL;
+  }
+
+  return MSD->res[nres].cols[pos].name;
+}
+
+static unsigned int MSSQL_GetFieldNumber(struct strDB *sDB, int nres, char *campo)
+{
+  unsigned int n, i;
+  struct mssql_data *MSD = (struct mssql_data *)sDB->Data.data;
+
+  if(MSD->res[nres].cols == NULL) {
+    DBG("colunas NULAS!\n");
+    return 0;
+  }
+
+  n = MSSQL_GetFieldCount(sDB, nres);
+  DBG("Procurando pela coluna %s em %d colunas\n", campo, n);
+  for(i = 0; i < n; i++)
+    {
+    if(!strcmp(MSD->res[nres].cols[i].name, campo))
+      break;
+    }
+
+  if(i < n) // Encontrou, retorna o índice.
+    return i;
+
+  return 0; // Não encontrou. Retorna o primeiro índice pois ele sempre existe.
+}
+
 static void MSSQL_FreeResult(struct strDB *sDB, int nres)
 {
   int ncols;
   struct COL *pcol;
   struct mssql_data *MSD = (struct mssql_data *)sDB->Data.data;
 
-  ncols = dbnumcols(MSD->res[nres].dbproc);
+  if(MSD->res[nres].cols == NULL) return;
+
+  ncols = MSSQL_GetFieldCount(sDB, nres);
 
   DBG("Desalocando %d colunas do result %d\n", ncols, nres);
   /* free metadata and data buffers */
@@ -106,7 +158,7 @@ static unsigned int MSSQL_GetCount(struct strDB *sDB, int nres)
   // Apenas consigo descobrir o numero de linhas depois de ler a ultima.
   // Preciso encontrar uma forma de contornar essa limitacao!
   // De preferencia sem precisar manter o resultado inteiro em memoria...
-  return 0;
+  return 1;
 }
 
 static int MSSQL_Init(struct strDB *sDB)
@@ -173,7 +225,7 @@ static RETCODE MSSQL_GetNextResult(struct strDB *sDB, int nres)
 
   RETCODE erc = dbresults(MSD->res[nres].dbproc);
   if(erc == SUCCEED) {
-    ncols = dbnumcols(MSD->res[nres].dbproc);
+    ncols = MSSQL_GetFieldCount(sDB, nres);
 
     if ((MSD->res[nres].cols = calloc(ncols, sizeof(struct COL))) == NULL) {
       return FAIL;
@@ -275,7 +327,7 @@ static void MSSQL_Dump(struct strDB *sDB, int nres)
 
   DBG("*** Dump dos dados no conjunto %d ***\n\n", nres);
 
-  nf = dbnumcols(MSD->res[nres].dbproc);
+  nf = MSSQL_GetFieldCount(sDB, nres);
   printf("Existem %d colunas:\n", nf);
   for(t=0; t<nf; t++) {
     printf("Coluna %d: nome '%s', tipo %d, size %d\n", t,
@@ -297,35 +349,11 @@ static void MSSQL_Dump(struct strDB *sDB, int nres)
   }
 }
 
-static unsigned int MSSQL_GetFieldNumber(struct strDB *sDB, int nres, char *campo)
-{
-  unsigned int n, i;
-  struct mssql_data *MSD = (struct mssql_data *)sDB->Data.data;
-
-  if(MSD->res[nres].cols == NULL) {
-    DBG("colunas NULAS!\n");
-    return 0;
-  }
-
-  n = dbnumcols(MSD->res[nres].dbproc);
-  DBG("Procurando pela coluna %s em %d colunas\n", campo, n);
-  for(i = 0; i < n; i++)
-    {
-    if(!strcmp(MSD->res[nres].cols[i].name, campo))
-      break;
-    }
-
-  if(i < n) // Encontrou, retorna o índice.
-    return i;
-
-  return 0; // Não encontrou. Retorna o primeiro índice pois ele sempre existe.
-}
-
 static char * MSSQL_GetData(struct strDB *sDB, int nres, unsigned int pos)
 {
   struct mssql_data *MSD = (struct mssql_data *)sDB->Data.data;
 
-  if(pos < dbnumcols(MSD->res[nres].dbproc)) {
+  if(pos < MSSQL_GetFieldCount(sDB, nres)) {
     return MSD->res[nres].cols[pos].buffer;
   }
 
@@ -353,6 +381,8 @@ struct DriverList * MSSQL_InitDriver(void)
   Driver->fncExecute        = MSSQL_Execute;
   Driver->fncGetNextRow     = MSSQL_GetNextRow;
   Driver->fncDump           = MSSQL_Dump;
+  Driver->fncGetFieldCount  = MSSQL_GetFieldCount;
+  Driver->fncGetFieldName   = MSSQL_GetFieldName;
   Driver->fncGetFieldNumber = MSSQL_GetFieldNumber;
   Driver->fncGetData        = MSSQL_GetData;
 
