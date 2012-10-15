@@ -66,7 +66,11 @@ int err_handler(DBPROCESS * dbproc, int severity, int dberr, int oserr,
 
 static unsigned int MSSQL_GetFieldCount(struct strDB *sDB, int nres)
 {
-  struct mssql_data *MSD = (struct mssql_data *)sDB->Data.data;
+  struct mssql_data *MSD = sDB ? (struct mssql_data *)sDB->Data.data : NULL;
+  if(MSD == NULL) {
+    DBG("MSD Nulo!\n");
+    return 0;
+  }
 
   return dbnumcols(MSD->res[nres].dbproc);
 }
@@ -74,7 +78,11 @@ static unsigned int MSSQL_GetFieldCount(struct strDB *sDB, int nres)
 static char * MSSQL_GetFieldName(struct strDB *sDB, int nres, unsigned int pos)
 {
   unsigned int n;
-  struct mssql_data *MSD = (struct mssql_data *)sDB->Data.data;
+  struct mssql_data *MSD = sDB ? (struct mssql_data *)sDB->Data.data : NULL;
+  if(MSD == NULL) {
+    DBG("MSD Nulo!\n");
+    return NULL;
+  }
 
   if(MSD->res[nres].cols == NULL) {
     DBG("colunas NULAS!\n");
@@ -93,7 +101,11 @@ static char * MSSQL_GetFieldName(struct strDB *sDB, int nres, unsigned int pos)
 static unsigned int MSSQL_GetFieldNumber(struct strDB *sDB, int nres, char *campo)
 {
   unsigned int n, i;
-  struct mssql_data *MSD = (struct mssql_data *)sDB->Data.data;
+  struct mssql_data *MSD = sDB ? (struct mssql_data *)sDB->Data.data : NULL;
+  if(MSD == NULL) {
+    DBG("MSD Nulo!\n");
+    return 0;
+  }
 
   if(MSD->res[nres].cols == NULL) {
     DBG("colunas NULAS!\n");
@@ -118,7 +130,11 @@ static void MSSQL_FreeResult(struct strDB *sDB, int nres)
 {
   int ncols;
   struct COL *pcol;
-  struct mssql_data *MSD = (struct mssql_data *)sDB->Data.data;
+  struct mssql_data *MSD = sDB ? (struct mssql_data *)sDB->Data.data : NULL;
+  if(MSD == NULL) {
+    DBG("MSD Nulo!\n");
+    return;
+  }
 
   if(MSD->res[nres].cols == NULL) return;
 
@@ -136,7 +152,11 @@ static void MSSQL_FreeResult(struct strDB *sDB, int nres)
 
 static void MSSQL_Flush(struct strDB *sDB, int nres)
 {
-  struct mssql_data *MSD = (struct mssql_data *)sDB->Data.data;
+  struct mssql_data *MSD = sDB ? (struct mssql_data *)sDB->Data.data : NULL;
+  if(MSD == NULL) {
+    DBG("MSD Nulo!\n");
+    return;
+  }
 
   // Descarrega dados atuais
   MSSQL_FreeResult(sDB, nres);
@@ -205,20 +225,32 @@ static int MSSQL_Init(struct strDB *sDB)
 static void MSSQL_Close(struct strDB *sDB)
 {
   int i;
+  struct mssql_data *MSD = sDB ? (struct mssql_data *)sDB->Data.data : NULL;
 
-  struct mssql_data *MSD = (struct mssql_data *)sDB->Data.data;
+  MSSQL_Free(sDB);
+
+  if(MSD == NULL) {
+    DBG("MSD Nulo!\n");
+    return;
+  }
 
   for(i=0; i<DB_MAX_RES; i++) {
     DBG("Fechando conexao com banco. result = %d\n", i);
     dbclose(MSD->res[i].dbproc);
   }
+
+  free(MSD);
 }
 
 static RETCODE MSSQL_GetNextResult(struct strDB *sDB, int nres)
 {
   int ncols;
   struct COL *pcol;
-  struct mssql_data *MSD = (struct mssql_data *)sDB->Data.data;
+  struct mssql_data *MSD = sDB ? (struct mssql_data *)sDB->Data.data : NULL;
+  if(MSD == NULL) {
+    DBG("MSD Nulo!\n");
+    return FAIL;
+  }
 
   // Desaloca memoria utilizada pelo result anterior
   MSSQL_FreeResult(sDB, nres);
@@ -273,7 +305,11 @@ static RETCODE MSSQL_GetNextResult(struct strDB *sDB, int nres)
 
 static int MSSQL_Execute(struct strDB *sDB, int nres, char *sql)
 {
-  struct mssql_data *MSD = (struct mssql_data *)sDB->Data.data;
+  struct mssql_data *MSD = sDB ? (struct mssql_data *)sDB->Data.data : NULL;
+  if(MSD == NULL) {
+    DBG("MSD Nulo!\n");
+    return -4;
+  }
 
   if(dbcmd(MSD->res[nres].dbproc, sql) == FAIL) {
     dbfreebuf(MSD->res[nres].dbproc);
@@ -296,7 +332,11 @@ static int MSSQL_Execute(struct strDB *sDB, int nres, char *sql)
 static int MSSQL_GetNextRow(struct strDB *sDB, int nres)
 {
   int row_code;
-  struct mssql_data *MSD = (struct mssql_data *)sDB->Data.data;
+  struct mssql_data *MSD = sDB ? (struct mssql_data *)sDB->Data.data : NULL;
+  if(MSD == NULL) {
+    DBG("MSD Nulo!\n");
+    return 0;
+  }
 
   while ((row_code = dbnextrow(MSD->res[nres].dbproc)) != NO_MORE_ROWS) {
     switch (row_code) {
@@ -318,7 +358,11 @@ static int MSSQL_GetNextRow(struct strDB *sDB, int nres)
 static void MSSQL_Dump(struct strDB *sDB, int nres)
 {
   int t,nf;
-  struct mssql_data *MSD = (struct mssql_data *)sDB->Data.data;
+  struct mssql_data *MSD = sDB ? (struct mssql_data *)sDB->Data.data : NULL;
+  if(MSD == NULL) {
+    DBG("MSD Nulo!\n");
+    return;
+  }
 
   if(MSD->res[nres].cols == NULL) {
     DBG("Colunas NULAS!\n");
@@ -351,7 +395,11 @@ static void MSSQL_Dump(struct strDB *sDB, int nres)
 
 static char * MSSQL_GetData(struct strDB *sDB, int nres, unsigned int pos)
 {
-  struct mssql_data *MSD = (struct mssql_data *)sDB->Data.data;
+  struct mssql_data *MSD = sDB ? (struct mssql_data *)sDB->Data.data : NULL;
+  if(MSD == NULL) {
+    DBG("MSD Nulo!\n");
+    return NULL;
+  }
 
   if(pos < MSSQL_GetFieldCount(sDB, nres)) {
     return MSD->res[nres].cols[pos].buffer;
