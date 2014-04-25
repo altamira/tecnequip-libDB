@@ -182,7 +182,7 @@ static char * MySQL_GetData(struct strDB *sDB, int nres, unsigned int pos)
 {
   struct mysql_data *MSD = (struct mysql_data *)sDB->Data.data;
 
-  if(pos < MySQL_GetFieldCount(sDB, nres))
+  if(pos < MySQL_GetFieldCount(sDB, nres) && MSD->row[nres] != NULL)
     return MSD->row[nres][pos];
 
   return NULL;
